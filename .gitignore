@@ -1,0 +1,112 @@
+##########################
+# Maven Build Artifacts  #
+##########################
+target/
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+.mvn/wrapper/maven-wrapper.js
+
+# Maven release plugin files
+release.properties
+
+###################
+# Java Artifacts  #
+###################
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.log
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+############################
+# IDE / Editor Directories #
+############################
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+out/
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+
+# NetBeans
+nbproject/private/
+build/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# VS Code
+.vscode/
+
+##########################
+# OS-specific Junk Files #
+##########################
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+################################
+# P2P File Sharing Application  #
+################################
+
+# Directory for shared files (modify as needed)
+shared-files/
+received-files/
+temp-transfer/
+uploads/
+downloads/
+
+# Temporary chunks created during P2P transfers
+*.part
+*.chunk
+*.tmp
+
+# Ignore encrypted or metadata files if generated
+*.meta
+*.key
+
+##########################
+# Logs & Runtime Files   #
+##########################
+logs/
+*.log
+*.trace
+*.pid
+
+###################################
+# Environment & Configuration     #
+###################################
+.env
+*.properties.local
+config/
+secrets/
+credentials/
+
+##########################
+# Misc                   #
+##########################
+*.bak
+*.swp
+*.swo
