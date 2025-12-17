@@ -9,6 +9,7 @@ import p2p.service.FileSharer;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -19,9 +20,9 @@ public class FileController {
     private final String uploadDir;
     private final ExecutorService executorService;
 
-    public FileController() throws IOException {
+    public FileController(int port) throws IOException {
         this.fileSharer = new FileSharer();
-        this.server = HttpServer.create(new InetSocketAddress(5000), 0);
+        this.server = HttpServer.create(new InetSocketAddress(port), 0);
         this.uploadDir = System.getProperty("java.io.tmpdir") + File.separator + "peerlink-uploads";
         this.executorService = Executors.newFixedThreadPool(10);
 
@@ -34,6 +35,7 @@ public class FileController {
         server.createContext("/upload", new UploadHandler());
         server.createContext("/download", new DownloadHandler());
         server.createContext("/", new CORSHandler());
+        server.createContext("/sayHello", new SayHelloHandler());
         server.setExecutor(executorService);
     }
 
@@ -127,10 +129,22 @@ public class FileController {
                     fos.write(result.fileContent);
                 }
                 int port = fileSharer.offerFiles(filePath);
+                new Thread(() -> fileSharer.startFileServer(port)).start();
+                String jsonResponse = "{\"port\":" + port + " }";
+                headers.add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
+                try(OutputStream oos = exchange.getResponseBody()) {
+                    oos.write(jsonResponse.getBytes());
+                }
 
             }
             catch(Exception ex) {
                 System.err.println("Error uploading file to server " + ex.getMessage());
+                String response = "SERVER ERROR: " + ex.getMessage();
+                exchange.sendResponseHeaders(500, response.getBytes().length);
+                try(OutputStream oos = exchange.getResponseBody()) {
+                    oos.write(response.getBytes());
+                }
             }
         }
     }
@@ -224,4 +238,109 @@ public class FileController {
         }
     }
 
+    private class DownloadHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            Headers headers = exchange.getResponseHeaders();
+            headers.add("Access-Control-Allow-Origin", "*");
+
+            if (!exchange.getRequestMethod().equalsIgnoreCase("GET")) {
+                String response = "Method Not Allowed";
+                exchange.sendResponseHeaders(405, response.getBytes().length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(response.getBytes());
+                }
+                return;
+            }
+
+            String path = exchange.getRequestURI().getPath();
+            String portStr = path.substring(path.lastIndexOf('/') + 1);
+
+            try {
+                int port = Integer.parseInt(portStr);
+
+                try (Socket socket = new Socket("localhost", port);
+                     InputStream socketInput = socket.getInputStream()) {
+
+                    File tempFile = File.createTempFile("download-", ".tmp");
+                    String filename = "downloaded-file"; // Default filename
+
+                    try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+
+                        ByteArrayOutputStream headerBaos = new ByteArrayOutputStream();
+                        int b;
+                        while ((b = socketInput.read()) != -1) {
+                            if (b == '\n') break;
+                            headerBaos.write(b);
+                        }
+
+                        String header = headerBaos.toString().trim();
+                        if (header.startsWith("Filename: ")) {
+                            filename = header.substring("Filename: ".length());
+                        }
+
+                        while ((bytesRead = socketInput.read(buffer)) != -1) {
+                            fos.write(buffer, 0, bytesRead);
+                        }
+                    }
+
+                    headers.add("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+                    headers.add("Content-Type", "application/octet-stream");
+
+                    exchange.sendResponseHeaders(200, tempFile.length());
+                    try (OutputStream os = exchange.getResponseBody();
+                         FileInputStream fis = new FileInputStream(tempFile)) {
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = fis.read(buffer)) != -1) {
+                            os.write(buffer, 0, bytesRead);
+                        }
+                    }
+
+                    tempFile.delete();
+
+                } catch (IOException e) {
+                    System.err.println("Error downloading file from peer: " + e.getMessage());
+                    String response = "Error downloading file: " + e.getMessage();
+                    headers.add("Content-Type", "text/plain");
+                    exchange.sendResponseHeaders(500, response.getBytes().length);
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(response.getBytes());
+                    }
+                }
+
+            } catch (NumberFormatException e) {
+                String response = "Bad Request: Invalid port number";
+                exchange.sendResponseHeaders(400, response.getBytes().length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(response.getBytes());
+                }
+            }
+        }
+    }
+
+    private class SayHelloHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            Headers headers = exchange.getResponseHeaders();
+            headers.add("Access-Control-Allow-Origin", "*");
+
+            String response = "HELLO JI👋";
+            if(!exchange.getRequestMethod().equalsIgnoreCase("GET")) {
+                response = "METHOD NOT ALLOWED";
+                exchange.sendResponseHeaders(405, response.getBytes().length);
+                try (OutputStream oos = exchange.getResponseBody()) {
+                    oos.write(response.getBytes());
+                }
+                return ;
+            }
+
+            exchange.sendResponseHeaders(200, response.getBytes().length);
+            try (OutputStream oos = exchange.getResponseBody()) {
+                oos.write(response.getBytes());
+            }
+        }
+    }
 }
