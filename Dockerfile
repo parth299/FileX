@@ -1,30 +1,25 @@
 # ---------- BUILD STAGE ----------
 FROM maven:3.9.6-eclipse-temurin-17 AS build
-
-# Set working directory inside the container
 WORKDIR /app
 
-# Copy Maven config first (pom.xml) to leverage caching of dependencies
+# Copy pom only first to cache dependencies
 COPY pom.xml .
 
 # Download dependencies
 RUN mvn dependency:go-offline -B
 
-# Copy the source code
+# Copy source and build
 COPY src ./src
-
-# Build the project and skip tests for faster build
 RUN mvn clean package -DskipTests
 
 # ---------- RUN STAGE ----------
-# Use a lightweight JDK image for running the app
-FROM eclipse-temurin:17-jdk-slim
+# Use an official Eclipse Temurin JDK image
+FROM eclipse-temurin:17-jdk
 
-# Set working directory
 WORKDIR /app
 
-# Copy the built JAR from the build stage
+# Copy the jar from the build stage
 COPY --from=build /app/target/*.jar app.jar
 
-# Default command to run your JAR
+# Default command to run your app
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
